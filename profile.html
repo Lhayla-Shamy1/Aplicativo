@@ -272,37 +272,64 @@
     const btnRemover = document.getElementById("removerFoto");
     const btnSair = document.getElementById("btnSair");
 
+    let currentUserId = null;
+
     // Mostrar nome e email do Firebase
     onAuthStateChanged(auth, (user) => {
       if (user) {
-        nomeEl.textContent = user.displayName || "Usuário sem nome";
+        currentUserId = user.uid; // Guardar o ID do usuário atual
+        
+        // Exibir o nome se disponível, caso contrário exibir parte do email
+        if (user.displayName) {
+          nomeEl.textContent = user.displayName;
+        } else if (user.email) {
+          // Mostrar parte do email antes do @ se não tiver nome
+          const emailPart = user.email.split('@')[0];
+          nomeEl.textContent = emailPart;
+        } else {
+          nomeEl.textContent = "Usuário";
+        }
         emailEl.textContent = user.email || "";
+        
+        // Carregar foto do usuário específico
+        carregarFotoUsuario(user.uid);
       } else {
+        currentUserId = null;
         nomeEl.textContent = "Não autenticado";
         emailEl.textContent = "";
+        // Mostrar imagem padrão quando não estiver logado
+        imgPreview.src = "USUARIO.jpg";
+        btnRemover.style.display = "none";
       }
     });
 
-    // Carregar foto salva (apenas se tiver sido adicionada pelo usuário)
-    window.addEventListener("DOMContentLoaded", () => {
-      const fotoSalva = localStorage.getItem("fotoUsuario");
+    // Carregar foto salva para o usuário específico
+    function carregarFotoUsuario(userId) {
+      const fotoSalva = localStorage.getItem(`fotoUsuario_${userId}`);
       if (fotoSalva) {
         imgPreview.src = fotoSalva;
         btnRemover.style.display = "flex"; // mostra botão remover
       } else {
+        imgPreview.src = "USUARIO.jpg";
         btnRemover.style.display = "none"; // esconde botão
       }
-    });
+    }
 
     // Trocar foto
     inputFoto.addEventListener("change", function () {
+      if (!currentUserId) {
+        alert("Você precisa estar logado para alterar a foto.");
+        return;
+      }
+      
       const file = this.files[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = function (e) {
           const imagemBase64 = e.target.result;
           imgPreview.src = imagemBase64;
-          localStorage.setItem("fotoUsuario", imagemBase64);
+          // Salvar a foto com a chave específica do usuário
+          localStorage.setItem(`fotoUsuario_${currentUserId}`, imagemBase64);
           btnRemover.style.display = "flex"; // mostra botão remover
         };
         reader.readAsDataURL(file);
@@ -311,34 +338,18 @@
 
     // Remover foto
     btnRemover.addEventListener("click", () => {
-      localStorage.removeItem("fotoUsuario");
+      if (!currentUserId) return;
+      
+      localStorage.removeItem(`fotoUsuario_${currentUserId}`);
       imgPreview.src = "USUARIO.jpg";
       btnRemover.style.display = "none"; // esconde botão
     });
-    onAuthStateChanged(auth, (user) => {
-    if (user) {
-      // Exibir o nome se disponível, caso contrário exibir parte do email
-      if (user.displayName) {
-        nomeEl.textContent = user.displayName;
-      } else if (user.email) {
-        // Mostrar parte do email antes do @ se não tiver nome
-        const emailPart = user.email.split('@')[0];
-        nomeEl.textContent = emailPart;
-      } else {
-        nomeEl.textContent = "Usuário";
-      }
-      emailEl.textContent = user.email || "";
-    } else {
-      nomeEl.textContent = "Não autenticado";
-      emailEl.textContent = "";
-    }
-  });
 
     // Função para sair da conta
     btnSair.addEventListener("click", () => {
       signOut(auth).then(() => {
-        // Limpar dados locais se necessário
-        localStorage.removeItem("fotoUsuario");
+        // NÃO removemos a foto do localStorage ao deslogar
+        // A foto permanece salva com a chave do usuário
         // Redirecionar para a página de login
         window.location.href = "login.html";
       }).catch((error) => {
