@@ -29,6 +29,7 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     padding: 20px;
     position: relative;
+    overflow-y: auto;
   }
 
   /* Botão de voltar */
@@ -151,6 +152,49 @@
   background-color: #b13421f1;
 }
 
+/* Resumo do pedido */
+.order-summary {
+  background: #fff6ec;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.order-summary h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #a13a24;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.order-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e0e0e0;
+  font-weight: bold;
+}
+
+.discount-applied {
+  color: #af784c;
+  font-size: 13px;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 </style>
 </head>
@@ -166,6 +210,22 @@
     <div class="title">Forma de pagamento - PIX</div>
     <div class="payment-status" id="paymentStatus">Pagamento pendente</div>
     <div class="info-text">Você tem <span id="countdown">xx:xx</span> minutos para pagar com esse PIX</div>
+    
+    <!-- Resumo do pedido -->
+    <div class="order-summary">
+      <h3><i class="bi bi-receipt"></i> Resumo do Pedido</h3>
+      <div id="order-items">
+        <!-- Itens serão preenchidos via JavaScript -->
+      </div>
+      <div class="order-total">
+        <span>Total:</span>
+        <span id="order-total">R$ 0,00</span>
+      </div>
+      <div id="discount-info" class="discount-applied" style="display: none;">
+        <i class="bi bi-tag"></i> Cupom aplicado: <span id="cupom-codigo"></span> (<span id="cupom-desconto"></span>% off)
+      </div>
+    </div>
+    
     <div class="qr-container" title="Escanear QR Code">
         <div class="qr-label">Escanear Qr Code</div>
             <i class="bi bi-qr-code-scan"></i>
@@ -195,6 +255,7 @@
       timeLeft--;
     } else {
       document.getElementById('paymentStatus').textContent = 'Pagamento expirado';
+      document.getElementById('payButton').disabled = true;
       clearInterval(timerInterval);
     }
   }
@@ -204,32 +265,95 @@
 
   // Função para copiar chave PIX
   function copyPixKey() {
-  const pixKey = document.getElementById('pixKey').textContent;
-  navigator.clipboard.writeText(pixKey).then(() => {
-    const feedback = document.getElementById('copyFeedback');
-    feedback.style.opacity = '1';
-    feedback.style.display = 'block';
-    
-    // Animação de fade out após 2 segundos
-    setTimeout(() => {
-      feedback.style.opacity = '0';
-      // Depois do fade out, esconde completamente
+    const pixKey = document.getElementById('pixKey').textContent;
+    navigator.clipboard.writeText(pixKey).then(() => {
+      const feedback = document.getElementById('copyFeedback');
+      feedback.style.opacity = '1';
+      feedback.style.display = 'block';
+      
+      // Animação de fade out após 2 segundos
       setTimeout(() => {
-        feedback.style.display = 'none';
-      }, 500);
-    }, 2000);
-  }).catch(() => {
-    alert('Falha ao copiar a chave PIX.');
+        feedback.style.opacity = '0';
+        // Depois do fade out, esconde completamente
+        setTimeout(() => {
+          feedback.style.display = 'none';
+        }, 500);
+      }, 2000);
+    }).catch(() => {
+      alert('Falha ao copiar a chave PIX.');
+    });
+  }
+
+  // Carregar dados do carrinho e aplicar cupom
+  function carregarDadosPagamento() {
+    const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
+    const cupomAplicado = parseInt(localStorage.getItem('cupomAplicado')) || 0;
+    const cupomCodigo = localStorage.getItem('cupomCodigo') || '';
+    
+    // Preencher itens do pedido
+    const orderItems = document.getElementById('order-items');
+    orderItems.innerHTML = '';
+    
+    let subtotal = 0;
+    
+    carrinho.forEach(item => {
+      const itemElement = document.createElement('div');
+      itemElement.className = 'order-item';
+      itemElement.innerHTML = `
+        <span>${item.nome} (${item.quantidade}x)</span>
+        <span>R$ ${item.total.toFixed(2).replace('.', ',')}</span>
+      `;
+      orderItems.appendChild(itemElement);
+      subtotal += item.total;
+    });
+    
+    // Aplicar desconto do cupom
+    const descontoValor = subtotal * (cupomAplicado / 100);
+    const total = subtotal - descontoValor;
+    
+    document.getElementById('order-total').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+    
+    // Mostrar informações do cupom se aplicável
+    if (cupomAplicado > 0) {
+      document.getElementById('discount-info').style.display = 'flex';
+      document.getElementById('cupom-codigo').textContent = cupomCodigo;
+      document.getElementById('cupom-desconto').textContent = cupomAplicado;
+    }
+  }
+
+  // Evento de clique no botão de pagamento
+  document.getElementById('payButton').addEventListener('click', () => {
+    // Salvar informações do cupom para usar na nota fiscal
+    const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
+    let total = 0;
+    carrinho.forEach(item => {
+      total += item.total;
+    });
+    
+    // Verificar se há cupom aplicável (simulando a lógica do carrinho)
+    let cupomAplicado = 0;
+    let cupomCodigo = '';
+    
+    if (total >= 200) {
+      cupomAplicado = 20;
+      cupomCodigo = "20OFF";
+    } else if (total >= 100) {
+      cupomAplicado = 10;
+      cupomCodigo = "10OFF";
+    } else if (total >= 50) {
+      cupomAplicado = 5;
+      cupomCodigo = "5OFF";
+    }
+    
+    localStorage.setItem('cupomAplicado', cupomAplicado);
+    localStorage.setItem('cupomCodigo', cupomCodigo);
+    
+    // Redirecionar para a nota fiscal
+    window.location.href = 'Notafiscal.html';
   });
-}
 
-document.getElementById('payButton').addEventListener('click', () => {
-  // Aqui poderia salvar dados no localStorage para simular pedido
-  // Por enquanto só redireciona
-  window.location.href = 'pedidos.html';
-});
-
-
+  // Carregar dados quando a página for carregada
+  document.addEventListener('DOMContentLoaded', carregarDadosPagamento);
 </script>
 
 </body>
