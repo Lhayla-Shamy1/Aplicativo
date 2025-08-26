@@ -284,11 +284,21 @@
     });
   }
 
+  // Função para calcular desconto baseado no valor total
+  function calcularDesconto(total) {
+    if (total >= 200) {
+      return { desconto: 20, codigo: "20OFF" };
+    } else if (total >= 100) {
+      return { desconto: 10, codigo: "10OFF" };
+    } else if (total >= 50) {
+      return { desconto: 5, codigo: "5OFF" };
+    }
+    return { desconto: 0, codigo: "" };
+  }
+
   // Carregar dados do carrinho e aplicar cupom
   function carregarDadosPagamento() {
     const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
-    const cupomAplicado = parseInt(localStorage.getItem('cupomAplicado')) || 0;
-    const cupomCodigo = localStorage.getItem('cupomCodigo') || '';
     
     // Preencher itens do pedido
     const orderItems = document.getElementById('order-items');
@@ -307,47 +317,32 @@
       subtotal += item.total;
     });
     
-    // Aplicar desconto do cupom
-    const descontoValor = subtotal * (cupomAplicado / 100);
+    // Calcular desconto baseado no valor total
+    const descontoInfo = calcularDesconto(subtotal);
+    const descontoValor = subtotal * (descontoInfo.desconto / 100);
     const total = subtotal - descontoValor;
     
     document.getElementById('order-total').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
     
     // Mostrar informações do cupom se aplicável
-    if (cupomAplicado > 0) {
+    if (descontoInfo.desconto > 0) {
       document.getElementById('discount-info').style.display = 'flex';
-      document.getElementById('cupom-codigo').textContent = cupomCodigo;
-      document.getElementById('cupom-desconto').textContent = cupomAplicado;
+      document.getElementById('cupom-codigo').textContent = descontoInfo.codigo;
+      document.getElementById('cupom-desconto').textContent = descontoInfo.desconto;
+      
+      // Salvar informações do cupom para usar na nota fiscal
+      localStorage.setItem('cupomAplicado', descontoInfo.desconto);
+      localStorage.setItem('cupomCodigo', descontoInfo.codigo);
+    } else {
+      document.getElementById('discount-info').style.display = 'none';
+      // Limpar cupom do localStorage se não houver desconto
+      localStorage.removeItem('cupomAplicado');
+      localStorage.removeItem('cupomCodigo');
     }
   }
 
   // Evento de clique no botão de pagamento
   document.getElementById('payButton').addEventListener('click', () => {
-    // Salvar informações do cupom para usar na nota fiscal
-    const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
-    let total = 0;
-    carrinho.forEach(item => {
-      total += item.total;
-    });
-    
-    // Verificar se há cupom aplicável (simulando a lógica do carrinho)
-    let cupomAplicado = 0;
-    let cupomCodigo = '';
-    
-    if (total >= 200) {
-      cupomAplicado = 20;
-      cupomCodigo = "20OFF";
-    } else if (total >= 100) {
-      cupomAplicado = 10;
-      cupomCodigo = "10OFF";
-    } else if (total >= 50) {
-      cupomAplicado = 5;
-      cupomCodigo = "5OFF";
-    }
-    
-    localStorage.setItem('cupomAplicado', cupomAplicado);
-    localStorage.setItem('cupomCodigo', cupomCodigo);
-    
     // Redirecionar para a nota fiscal
     window.location.href = 'Notafiscal.html';
   });
