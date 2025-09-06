@@ -348,7 +348,7 @@
     </div>
 
     <script>
-     
+        // Configuração do Firebase - substitua com suas credenciais
         const firebaseConfig = {
             apiKey: "AIzaSyAa3aKccdUFajT6zs9NSRIyRLYpDifsjgs",
             authDomain: "titan-50e74.firebaseapp.com",
@@ -359,9 +359,11 @@
             measurementId: "G-ZNJ8P95R71"
         };
 
+        // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Gerar dados aleatórios para a nota fiscal
         function gerarNumeroPedido() {
             return 'PED' + Math.floor(100000 + Math.random() * 900000);
         }
@@ -377,22 +379,22 @@
             return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
         }
 
-     
+        // Buscar dados da compra no Firebase
         async function carregarDadosCompra() {
             try {
-            
+                // Obter ID da compra da URL ou do localStorage
                 const urlParams = new URLSearchParams(window.location.search);
                 let compraId = urlParams.get('compraId') || localStorage.getItem('ultimaCompraId');
                 
                 if (!compraId) {
-
+                    // Se não encontrar ID, mostrar mensagem de erro
                     document.getElementById('loading-content').innerHTML = 
                         '<p>Não foi possível encontrar os dados da compra.</p>' +
                         '<button class="btn btn-secondary" onclick="voltarParaHome()">Voltar à Loja</button>';
                     return;
                 }
                 
-             
+                // Buscar compra no Firebase
                 const doc = await db.collection("compras").doc(compraId).get();
                 
                 if (!doc.exists) {
@@ -403,20 +405,22 @@
                 }
                 
                 const compra = doc.data();
- 
+                
+                // Preencher dados da compra
                 document.getElementById('data-hora').textContent = formatarData(compra.dataCompra);
                 document.getElementById('numero-pedido').textContent = compraId;
                 document.getElementById('transacao-id').textContent = gerarIdTransacao();
                 
-              
+                // Calcular subtotal a partir dos itens
                 let subtotal = 0;
                 compra.itens.forEach(item => {
                     subtotal += item.total;
                 });
-
+                
+                // Calcular desconto (se aplicado)
                 let descontoValor = 0;
                 if (compra.cupomAplicado && compra.cupomAplicado !== "Nenhum") {
-               
+                    // Extrair percentual de desconto do texto do cupom
                     const percentualMatch = compra.cupomAplicado.match(/(\d+)% off/);
                     if (percentualMatch) {
                         const percentual = parseInt(percentualMatch[1]);
@@ -428,7 +432,7 @@
                 
                 document.getElementById('subtotal').textContent = 'R$ ' + subtotal.toFixed(2).replace('.', ',');
                 
-          
+                // Exibir desconto se aplicável
                 const descontoContainer = document.getElementById('desconto-container');
                 if (descontoValor > 0) {
                     descontoContainer.innerHTML = `
@@ -442,7 +446,7 @@
                 
                 document.getElementById('total').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
                 
-   
+                // Preencher itens
                 const itensContainer = document.getElementById('itens-pedido');
                 itensContainer.innerHTML = '';
                 
@@ -457,7 +461,7 @@
                     itensContainer.appendChild(itemElement);
                 });
                 
-
+                // Mostrar conteúdo da nota fiscal
                 document.getElementById('loading-content').style.display = 'none';
                 document.getElementById('invoice-content').style.display = 'block';
                 
@@ -469,7 +473,7 @@
             }
         }
         
-      
+        // Função para baixar a nota fiscal em PDF
         function downloadPDF() {
             const element = document.getElementById('invoice');
             const options = {
@@ -484,12 +488,12 @@
         }
         
         function voltarParaHome() {
-
+            // Limpar dados temporários
             localStorage.removeItem('ultimaCompraId');
             window.location.href = 'home.html';
         }
         
-
+        // Inicializar a página
         document.addEventListener('DOMContentLoaded', carregarDadosCompra);
     </script>
 </body>
