@@ -1,5 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAa3aKccdUFajT6zs9NSRIyRLYpDifsjgs",
@@ -30,3 +30,4 @@ submit.addEventListener("click", function(event) {
       alert(error.message); // Mostra a mensagem de erro real
     });
 });
+
