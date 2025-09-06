@@ -6,6 +6,9 @@
   <title>Meu Carrinho</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"/>
+  <script src="https://www.gstatic.com/firebasejs/12.1.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.1.0/firebase-auth-compat.js"></script>
   <style>
     body {
       margin: 0;
@@ -204,6 +207,13 @@
     footer nav ul li a.active {
       color: #c94c29;
     }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin: 10px 0;
+      color: #a8432a;
+    }
   </style>
 </head>
 <body>
@@ -214,7 +224,7 @@
     <h2>Meu Carrinho</h2>
   </header>
 
-  <!-- Barra de selecionar todos + contador -->
+
   <div class="select-bar">
     <div class="select-left">
       <input type="checkbox" id="select-all"> Selecionar todos
@@ -227,7 +237,9 @@
   <div class="total" id="total-geral">Total: R$ 0,00</div>
   <div class="cupom" id="cupom-box"></div>
 
-  <button id="finalizar-compra" onclick="finalizarCompra()">Comprar</button>
+  <div class="loading" id="loading">Processando pagamento...</div>
+
+  <button id="finalizar-compra" onclick="iniciarProcessoPagamento()">Finalizar Compra</button>
 
   <footer>
     <nav>
@@ -240,6 +252,21 @@
   </footer>
 
   <script>
+ 
+    const firebaseConfig = {
+      apiKey: "AIzaSyAa3aKccdUFajT6zs9NSRIyRLYpDifsjgs",
+      authDomain: "titan-50e74.firebaseapp.com",
+      projectId: "titan-50e74",
+      storageBucket: "titan-50e74.firebasestorage.app",
+      messagingSenderId: "5930758953",
+      appId: "1:5930758953:web:15943cf5801240d9c47d38",
+      measurementId: "G-ZNJ8P95R71"
+    };
+
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     let cupomSelecionado = 0;
 
     function carregarCarrinho() {
@@ -343,14 +370,71 @@
       localStorage.setItem('carrinho', JSON.stringify(carrinho));
       carregarCarrinho();
     }
-
-    function finalizarCompra() {
+    async function salvarCompraNoFirebase(compraData) {
+      try {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('finalizar-compra').disabled = true;
+        
+        compraData.dataCompra = new Date();
+        compraData.status = "pendente";
+        
+        const docRef = await db.collection("compras").add(compraData);
+        console.log("Compra salva com ID: ", docRef.id);
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('finalizar-compra').disabled = false;
+        
+        return docRef.id;
+      } catch (error) {
+        console.error("Erro ao salvar compra: ", error);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('finalizar-compra').disabled = false;
+        alert("Erro ao finalizar compra. Tente novamente.");
+        return null;
+      }
+    }
+    async function iniciarProcessoPagamento() {
       const checkboxes = document.querySelectorAll(".item-checkbox:checked");
       if (checkboxes.length === 0) {
         alert("Selecione ao menos um item para continuar!");
         return;
       }
-      window.location.href = "pagamento.html";
+            const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
+      const itensSelecionados = [];
+      let total = 0;
+      
+      checkboxes.forEach(cb => {
+        const index = cb.getAttribute("data-index");
+        itensSelecionados.push(carrinho[index]);
+        total += carrinho[index].total;
+      });
+      
+
+      let totalFinal = total;
+      if (cupomSelecionado > 0) {
+        totalFinal = total - (total * cupomSelecionado / 100);
+      }
+      
+
+      const compraData = {
+        itens: itensSelecionados,
+        total: totalFinal,
+        cupomAplicado: cupomSelecionado > 0 ? `${cupomSelecionado}% off` : "Nenhum"
+      };
+      
+
+      const compraId = await salvarCompraNoFirebase(compraData);
+      
+      if (compraId) {
+       
+        localStorage.setItem('compraAtualId', compraId);
+        localStorage.setItem('compraAtualTotal', totalFinal);
+        localStorage.setItem('compraAtualItens', JSON.stringify(itensSelecionados));
+        localStorage.setItem('compraAtualCupom', cupomSelecionado > 0 ? `${cupomSelecionado}% off` : "Nenhum");
+        
+    
+        window.location.href = "pagamento.html";
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
