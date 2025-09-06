@@ -4,7 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
-
+<script src="https://www.gstatic.com/firebasejs/12.1.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore-compat.js"></script>
 <title>Pagamento PIX</title>
 <style>
   /* Reset simples */
@@ -44,7 +45,6 @@
     transition: background-color 0.2s ease;
     margin-bottom: 20px;
   }
-
 
   /* Conteúdo central */
   .content {
@@ -196,6 +196,13 @@
   gap: 4px;
 }
 
+.loading {
+  display: none;
+  text-align: center;
+  margin: 10px 0;
+  color: #a8432a;
+}
+
 </style>
 </head>
 <body>
@@ -237,14 +244,34 @@
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
       </svg>
     </div>
+    
+    <div class="loading" id="loading">Processando pagamento...</div>
     <button id="payButton" class="pay-button">Pagamento realizado</button>
   </div>
   <div class="copy-feedback" id="copyFeedback">Copiado!</div>
 </div>
 
 <script>
-  // Temporizador em segundos - 15 minutos = 900 segundos
-  let timeLeft = 15 * 60;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAa3aKccdUFajT6zs9NSRIyRLYpDifsjgs",
+    authDomain: "titan-50e74.firebaseapp.com",
+    projectId: "titan-50e74",
+    storageBucket: "titan-50e74.firebasestorage.app",
+    messagingSenderId: "5930758953",
+    appId: "1:5930758953:web:15943cf5801240d9c47d38",
+    measurementId: "G-ZNJ8P95R71"
+  };
+
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // Variáveis globais
+  let timeLeft = 15 * 60; // 15 minutos em segundos
+  let timerInterval;
+  let compraId = null;
+  let compraData = null;
 
   function updateCountdown() {
     let minutes = Math.floor(timeLeft / 60);
@@ -257,11 +284,13 @@
       document.getElementById('paymentStatus').textContent = 'Pagamento expirado';
       document.getElementById('payButton').disabled = true;
       clearInterval(timerInterval);
+      
+      // Atualizar status no Firebase para expirado
+      if (compraId) {
+        atualizarStatusCompra('expirado');
+      }
     }
   }
-
-  let timerInterval = setInterval(updateCountdown, 1000);
-  updateCountdown();
 
   // Função para copiar chave PIX
   function copyPixKey() {
@@ -284,23 +313,72 @@
     });
   }
 
-  // Função para calcular desconto baseado no valor total
-  function calcularDesconto(total) {
-    if (total >= 200) {
-      return { desconto: 20, codigo: "20OFF" };
-    } else if (total >= 100) {
-      return { desconto: 10, codigo: "10OFF" };
-    } else if (total >= 50) {
-      return { desconto: 5, codigo: "5OFF" };
+
+  async function salvarCompraNoFirebase(compraData) {
+    try {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('payButton').disabled = true;
+      
+      compraData.dataCompra = new Date();
+      compraData.status = "pendente";
+      
+      const docRef = await db.collection("compras").add(compraData);
+      console.log("Compra salva com ID: ", docRef.id);
+      
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('payButton').disabled = false;
+      
+      return { id: docRef.id, ...compraData };
+    } catch (error) {
+      console.error("Erro ao salvar compra: ", error);
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('payButton').disabled = false;
+      alert("Erro ao finalizar compra. Tente novamente.");
+      return null;
     }
-    return { desconto: 0, codigo: "" };
   }
 
-  // Carregar dados do carrinho e aplicar cupom
-  function carregarDadosPagamento() {
-    const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
+
+  async function atualizarStatusCompra(status) {
+    try {
+      if (!compraId) return;
+      
+      const updateData = {
+        status: status,
+        dataAtualizacao: new Date()
+      };
+      
+      if (status === 'pago') {
+        updateData.dataPagamento = new Date();
+      }
+      
+      await db.collection("compras").doc(compraId).update(updateData);
+      console.log(`Status da compra ${compraId} atualizado para: ${status}`);
+    } catch (error) {
+      console.error("Erro ao atualizar status da compra: ", error);
+    }
+  }
+
+ 
+  function gerarCodigoPix(valor) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let codigo = '00020126580014br.gov.bcb.pix0136';
     
-    // Preencher itens do pedido
+ 
+    for (let i = 0; i < 20; i++) {
+      codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    codigo += `520400005303986540${valor.toFixed(2)}5802BR59006000Sao Paulo62070503***6304`;
+ 
+    codigo += 'A1B2';
+    
+    return codigo;
+  }
+
+  async function carregarDadosPagamento() {
+    const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
+
     const orderItems = document.getElementById('order-items');
     orderItems.innerHTML = '';
     
@@ -316,38 +394,87 @@
       orderItems.appendChild(itemElement);
       subtotal += item.total;
     });
-    
-    // Calcular desconto baseado no valor total
+
     const descontoInfo = calcularDesconto(subtotal);
     const descontoValor = subtotal * (descontoInfo.desconto / 100);
     const total = subtotal - descontoValor;
     
     document.getElementById('order-total').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
     
-    // Mostrar informações do cupom se aplicável
+
     if (descontoInfo.desconto > 0) {
       document.getElementById('discount-info').style.display = 'flex';
       document.getElementById('cupom-codigo').textContent = descontoInfo.codigo;
       document.getElementById('cupom-desconto').textContent = descontoInfo.desconto;
-      
-      // Salvar informações do cupom para usar na nota fiscal
-      localStorage.setItem('cupomAplicado', descontoInfo.desconto);
-      localStorage.setItem('cupomCodigo', descontoInfo.codigo);
     } else {
       document.getElementById('discount-info').style.display = 'none';
-      // Limpar cupom do localStorage se não houver desconto
-      localStorage.removeItem('cupomAplicado');
-      localStorage.removeItem('cupomCodigo');
+    }
+    
+    
+    const codigoPix = gerarCodigoPix(total);
+    document.getElementById('pixKey').textContent = codigoPix;
+    
+a
+    compraData = {
+      itens: carrinho,
+      total: total,
+      subtotal: subtotal,
+      desconto: descontoValor,
+      cupomAplicado: descontoInfo.desconto > 0 ? `${descontoInfo.codigo} (${descontoInfo.desconto}% off)` : "Nenhum",
+      status: "pendente"
+    };
+    
+
+    const compra = await salvarCompraNoFirebase(compraData);
+    if (compra) {
+      compraId = compra.id;
+      
+  
+      localStorage.setItem('ultimaCompraId', compraId);
+      
+  
+      timerInterval = setInterval(updateCountdown, 1000);
+      updateCountdown();
     }
   }
 
-  // Evento de clique no botão de pagamento
-  document.getElementById('payButton').addEventListener('click', () => {
-    // Redirecionar para a nota fiscal
-    window.location.href = 'Notafiscal.html';
+  function calcularDesconto(total) {
+    if (total >= 200) {
+      return { desconto: 20, codigo: "20OFF" };
+    } else if (total >= 100) {
+      return { desconto: 10, codigo: "10OFF" };
+    } else if (total >= 50) {
+      return { desconto: 5, codigo: "5OFF" };
+    }
+    return { desconto: 0, codigo: "" };
+  }
+
+  document.getElementById('payButton').addEventListener('click', async () => {
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('payButton').disabled = true;
+    
+
+    await atualizarStatusCompra('pago');
+    
+
+    clearInterval(timerInterval);
+    
+
+    document.getElementById('paymentStatus').textContent = 'Pagamento confirmado!';
+    document.getElementById('paymentStatus').style.backgroundColor = '#4caf50';
+    document.getElementById('paymentStatus').style.color = 'white';
+    
+
+    localStorage.removeItem('carrinho');
+    
+
+    setTimeout(() => {
+      window.location.href = 'Notafiscal.html';
+    }, 1500);
   });
 
-  // Carregar dados quando a página for carregada
+
   document.addEventListener('DOMContentLoaded', carregarDadosPagamento);
 </script>
 
