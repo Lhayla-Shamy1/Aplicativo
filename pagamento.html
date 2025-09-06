@@ -252,7 +252,7 @@
 </div>
 
 <script>
-
+  // Configuração do Firebase - substitua com suas credenciais
   const firebaseConfig = {
     apiKey: "AIzaSyAa3aKccdUFajT6zs9NSRIyRLYpDifsjgs",
     authDomain: "titan-50e74.firebaseapp.com",
@@ -263,7 +263,7 @@
     measurementId: "G-ZNJ8P95R71"
   };
 
-
+  // Inicializar Firebase
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
@@ -313,7 +313,7 @@
     });
   }
 
-
+  // Função para salvar a compra no Firebase
   async function salvarCompraNoFirebase(compraData) {
     try {
       document.getElementById('loading').style.display = 'block';
@@ -338,7 +338,7 @@
     }
   }
 
-
+  // Atualizar status da compra no Firebase
   async function atualizarStatusCompra(status) {
     try {
       if (!compraId) return;
@@ -359,26 +359,30 @@
     }
   }
 
- 
+  // Gerar código PIX (simulação)
   function gerarCodigoPix(valor) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let codigo = '00020126580014br.gov.bcb.pix0136';
     
- 
+    // Gerar parte aleatória do código
     for (let i = 0; i < 20; i++) {
       codigo += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
+    
+    // Adicionar valor ao final do código
     codigo += `520400005303986540${valor.toFixed(2)}5802BR59006000Sao Paulo62070503***6304`;
- 
+    
+    // Adicionar checksum (simulado)
     codigo += 'A1B2';
     
     return codigo;
   }
 
+  // Carregar dados do carrinho e aplicar cupom
   async function carregarDadosPagamento() {
     const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
-
+    
+    // Preencher itens do pedido
     const orderItems = document.getElementById('order-items');
     orderItems.innerHTML = '';
     
@@ -394,14 +398,15 @@
       orderItems.appendChild(itemElement);
       subtotal += item.total;
     });
-
+    
+    // Calcular desconto baseado no valor total
     const descontoInfo = calcularDesconto(subtotal);
     const descontoValor = subtotal * (descontoInfo.desconto / 100);
     const total = subtotal - descontoValor;
     
     document.getElementById('order-total').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
     
-
+    // Mostrar informações do cupom se aplicável
     if (descontoInfo.desconto > 0) {
       document.getElementById('discount-info').style.display = 'flex';
       document.getElementById('cupom-codigo').textContent = descontoInfo.codigo;
@@ -410,11 +415,11 @@
       document.getElementById('discount-info').style.display = 'none';
     }
     
-    
+    // Gerar e exibir código PIX
     const codigoPix = gerarCodigoPix(total);
     document.getElementById('pixKey').textContent = codigoPix;
     
-a
+    // Preparar dados da compra
     compraData = {
       itens: carrinho,
       total: total,
@@ -424,20 +429,21 @@ a
       status: "pendente"
     };
     
-
+    // Salvar compra no Firebase
     const compra = await salvarCompraNoFirebase(compraData);
     if (compra) {
       compraId = compra.id;
       
-  
+      // Salvar ID da compra no localStorage para usar na nota fiscal
       localStorage.setItem('ultimaCompraId', compraId);
       
-  
+      // Iniciar contador
       timerInterval = setInterval(updateCountdown, 1000);
       updateCountdown();
     }
   }
 
+  // Função para calcular desconto baseado no valor total
   function calcularDesconto(total) {
     if (total >= 200) {
       return { desconto: 20, codigo: "20OFF" };
@@ -449,32 +455,33 @@ a
     return { desconto: 0, codigo: "" };
   }
 
+  // Evento de clique no botão de pagamento
   document.getElementById('payButton').addEventListener('click', async () => {
-
+    // Mostrar loading
     document.getElementById('loading').style.display = 'block';
     document.getElementById('payButton').disabled = true;
     
-
+    // Atualizar status no Firebase para pago
     await atualizarStatusCompra('pago');
     
-
+    // Parar o contador
     clearInterval(timerInterval);
     
-
+    // Atualizar UI
     document.getElementById('paymentStatus').textContent = 'Pagamento confirmado!';
     document.getElementById('paymentStatus').style.backgroundColor = '#4caf50';
     document.getElementById('paymentStatus').style.color = 'white';
     
-
+    // Limpar carrinho
     localStorage.removeItem('carrinho');
     
-
+    // Redirecionar para a nota fiscal após breve delay
     setTimeout(() => {
       window.location.href = 'Notafiscal.html';
     }, 1500);
   });
 
-
+  // Carregar dados quando a página for carregada
   document.addEventListener('DOMContentLoaded', carregarDadosPagamento);
 </script>
 
